@@ -1,6 +1,6 @@
 /**
  * Cloudflare Worker CDN Gateway for https://cdn-qy77.onrender.com
- * Caches images, videos (HTTP 206 byte-ranges), and static assets at Cloudflare's Edge
+ * Fixes Cloudflare-to-Cloudflare header conflicts and double-slash paths
  */
 
 const ORIGIN_BACKEND = 'https://cdn-qy77.onrender.com';
@@ -8,18 +8,12 @@ const ORIGIN_BACKEND = 'https://cdn-qy77.onrender.com';
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const originUrl = new URL(url.pathname + url.search, ORIGIN_BACKEND);
 
-    // Forward headers but rewrite host to origin
-    const newHeaders = new Headers(request.headers);
-    newHeaders.set('host', new URL(ORIGIN_BACKEND).host);
+    // Clean duplicate slashes (e.g. //media/ -> /media/)
+    const cleanPath = url.pathname.replace(/\/+/g, '/');
+    const targetUrl = ORIGIN_BACKEND + cleanPath + url.search;
 
-    const originRequest = new Request(originUrl.toString(), {
-      method: request.method,
-      headers: newHeaders,
-    });
-
-    // Check Cloudflare Edge Cache
+    // Check Cloudflare Edge Cache first
     const cache = caches.default;
     let cachedResponse = await cache.match(request);
 
@@ -33,15 +27,24 @@ export default {
       });
     }
 
-    // Cache MISS: Fetch from Render backend
-    const response = await fetch(originRequest, {
+    // Prepare clean headers for Render (avoid CF-to-CF 403 Forbidden header spoofing block)
+    const forwardHeaders = new Headers();
+    if (request.headers.get('accept')) forwardHeaders.set('accept', request.headers.get('accept'));
+    if (request.headers.get('accept-encoding')) forwardHeaders.set('accept-encoding', request.headers.get('accept-encoding'));
+    if (request.headers.get('range')) forwardHeaders.set('range', request.headers.get('range'));
+    forwardHeaders.set('user-agent', request.headers.get('user-agent') || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
+
+    // Fetch from Render
+    const response = await fetch(targetUrl, {
+      method: request.method,
+      headers: forwardHeaders,
       cf: {
         cacheEverything: true,
         cacheTtl: 31536000, // 1 year edge cache
       },
     });
 
-    // Cache successful responses at Cloudflare Edge
+    // Save successful media to Cloudflare Edge Cache
     if (response.status === 200 || response.status === 206) {
       ctx.waitUntil(cache.put(request, response.clone()));
     }
@@ -56,4 +59,3 @@ export default {
     });
   },
 };
-
