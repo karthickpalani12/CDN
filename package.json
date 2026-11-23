@@ -1,0 +1,12 @@
+{
+  "name": "cdn-root",
+  "version": "1.0.0",
+  "description": "Root package for Render deployment",
+  "main": "node_service/server.js",
+  "scripts": {
+    "start": "node node_service/server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT"
+}
