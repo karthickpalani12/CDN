@@ -1,0 +1,19 @@
+{
+  "name": "cloudflare-node-cdn-service",
+  "version": "1.0.0",
+  "description": "Production Node.js Media Backend integrated with Cloudflare CDN",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "cdn",
+    "cloudflare",
+    "video-streaming",
+    "caching",
+    "nodejs"
+  ],
+  "author": "",
+  "license": "MIT"
+}
+
